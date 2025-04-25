@@ -16,6 +16,12 @@ class UserRegister(Resource):
     @user_ns.doc(description="Регистрация обычного пользователя (роль автоматически 'user')")
     def post(self):
         data = request.get_json()
+
+        if "role_name" in data:
+            del data["role_name"]
+
+        data["role_name"] = "user"
+
         return register_user(data)
 
 
@@ -63,17 +69,15 @@ class UserProfile(Resource):
 
 
 @user_ns.route('/teams')
-class TeamCreate(Resource):
+class TeamCollection(Resource):
     @jwt_required()
     @user_ns.expect(team_model)
-    @user_ns.doc(description="Создание команды")
+    @user_ns.doc(description="Создание новой команды")
     def post(self):
         data = request.get_json()
-
         username = get_jwt_identity()
         user = get_user_by_username(username)
 
-        # Внесли изменения: теперь команда создается по имени
         response = create_team({
             "team_name": data.get("team_name"),
             "description": data.get("description"),
@@ -83,46 +87,50 @@ class TeamCreate(Resource):
         return response
 
 
-@user_ns.route('/teams/invite')
-class TeamInvite(Resource):
-    @jwt_required()
-    @user_ns.expect(team_invite_model)
-    @user_ns.doc(description="Приглашение пользователя в команду")
-    def post(self):
-        data = request.get_json()
-        team_name = data.get("team_name")
-        username = data.get("username")  # Поиск по имени пользователя
-
-        current_username = get_jwt_identity()
-        current_user = get_user_by_username(current_username)
-
-        # Изменение поиска команды по имени
-        team = Team.query.filter_by(team_name=team_name).first()
-
-        if not team or team.team_lead_id != current_user.user_id:
-            return {"message": "Только тимлид может пригласить участников."}, HTTPStatus.FORBIDDEN
-
-        # Поиск пользователя по имени
-        user = User.query.filter_by(username=username).first()
-        if not user:
-            return {"message": "Пользователь не найден."}, HTTPStatus.NOT_FOUND
-
-        response, status = add_member_to_team(team.team_id, user.user_id)
-        return response, status
-
-
-@user_ns.route('/teams/<string:team_name>/members')
-class TeamMembers(Resource):
+@user_ns.route('/teams/<string:team_name>')
+class TeamItem(Resource):
     @jwt_required()
     @user_ns.doc(description="Получение участников команды")
     def get(self, team_name):
-        # Получаем команду по имени
         team = Team.query.filter_by(team_name=team_name).first()
+        if not team:
+            return {"message": "Команда не найдена."}, HTTPStatus.NOT_FOUND
+        return [user.to_dict() for user in team.members], HTTPStatus.OK
 
+    @jwt_required()
+    @user_ns.expect(team_invite_model)
+    @user_ns.doc(description="Приглашение пользователя в команду")
+    def put(self, team_name):
+        data = request.get_json()
+        inviter = get_user_by_username(get_jwt_identity())
+
+        team = Team.query.filter_by(team_name=team_name).first()
+        if not team or team.team_lead_id != inviter.user_id:
+            return {"message": "Только тимлид может приглашать участников."}, HTTPStatus.FORBIDDEN
+
+        invitee = User.query.filter_by(username=data.get("username")).first()
+        if not invitee:
+            return {"message": "Пользователь не найден."}, HTTPStatus.NOT_FOUND
+
+        response, status = add_member_to_team(team.team_id, invitee.user_id)
+        return response, status
+
+    @jwt_required()
+    @user_ns.doc(description="Выход пользователя из команды или удаление всей команды (если тимлид)")
+    def delete(self, team_name):
+        user = get_user_by_username(get_jwt_identity())
+        team = Team.query.filter_by(team_name=team_name).first()
         if not team:
             return {"message": "Команда не найдена."}, HTTPStatus.NOT_FOUND
 
-        # Получаем участников команды
-        members = team.members
+        if team.team_lead_id == user.user_id:
+            db.session.delete(team)
+            db.session.commit()
+            return {"message": f"Вы были тимлидом, команда '{team_name}' удалена."}, HTTPStatus.OK
 
-        return [user.to_dict() for user in members], HTTPStatus.OK
+        if user not in team.members:
+            return {"message": "Вы не состоите в этой команде."}, HTTPStatus.BAD_REQUEST
+
+        team.members.remove(user)
+        db.session.commit()
+        return {"message": f"Вы покинули команду '{team_name}'."}, HTTPStatus.OK

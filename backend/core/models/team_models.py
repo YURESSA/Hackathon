@@ -15,6 +15,25 @@ class Team(db.Model):
     def __repr__(self):
         return f"<Team {self.team_name}>"
 
+    def to_dict(self):
+        return {
+            "team_id": self.team_id,
+            "team_name": self.team_name,
+            "description": self.description,
+            "team_lead": {
+                "user_id": self.team_lead.user_id,
+                "username": self.team_lead.username,
+                "full_name": self.team_lead.full_name
+            } if self.team_lead else None,
+            "members": [
+                {
+                    "user_id": member.user_id,
+                    "username": member.username,
+                    "full_name": member.full_name
+                } for member in self.members
+            ]
+        }
+
 
 class TeamMember(db.Model):
     __tablename__ = 'team_members'

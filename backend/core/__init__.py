@@ -29,5 +29,8 @@ def register_apps(app):
     from backend.admin import admin_ns
     api.add_namespace(admin_ns, path='/api/admin')
 
+    from backend.organizer import organizer_ns
+    api.add_namespace(organizer_ns, path='/api/organization')
+
     from backend.jury import jury_ns
     api.add_namespace(jury_ns, path='/api/jury')

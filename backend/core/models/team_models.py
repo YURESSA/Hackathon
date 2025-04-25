@@ -12,6 +12,8 @@ class Team(db.Model):
 
     members = db.relationship('User', secondary='team_members', backref='teams')
 
+    cases = db.relationship('HackathonCase', secondary='team_cases', backref='teams')
+
     def __repr__(self):
         return f"<Team {self.team_name}>"
 

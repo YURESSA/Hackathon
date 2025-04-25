@@ -5,6 +5,7 @@ from flask_restx import Resource
 from backend.core.schemas.auth_schemas import *
 from backend.core.services.profile_service import *
 from . import jury_ns
+from ..core.models.hackathon_model import HackathonCase
 from ..core.models.team_models import TeamArtifacts, Team, ArtifactReview, TeamCase, TeamMember
 from ..core.schemas.hackathon_schemas import artifact_review_model
 
@@ -56,56 +57,45 @@ class ResidentProfile(Resource):
             return {"message": AuthMessages.AUTH_ACCESS_DENIED}, HTTPStatus.FORBIDDEN
         return delete_profile()
 
-
 @jury_ns.route('/teams/<string:team_name>/artifacts')
 class TeamArtifactsResource(Resource):
     @jwt_required()
     @jury_ns.doc(description="Получение артефактов команды по названию с составом и кейсами")
     def get(self, team_name):
-        # Проверка, что пользователь имеет роль 'jury'
         if not resident_required():
             return {"message": "Доступ только для жюри."}, HTTPStatus.FORBIDDEN
 
-        # Получаем команду по названию
-        team = Team.query.filter_by(name=team_name).first()
+        team = Team.query.filter_by(team_name=team_name).first()
         if not team:
             return {"message": "Команда не найдена."}, HTTPStatus.NOT_FOUND
 
-        # Получаем артефакты команды
-        artifacts = TeamArtifacts.query.filter_by(team_id=team.id).first()
+        artifacts = TeamArtifacts.query.filter_by(team_id=team.team_id).first()
         if not artifacts:
             return {"message": "Артефакты для этой команды не найдены."}, HTTPStatus.NOT_FOUND
 
-        # Получаем состав команды с ролями
-        team_members = TeamMember.query.filter_by(team_id=team.id).all()
+        team_members = TeamMember.query.filter_by(team_id=team.team_id).all()
         members_info = []
         for member in team_members:
-            role = member.role  # роль участника (например, "разработчик", "дизайнер")
-            user = User.query.filter_by(id=member.user_id).first()
+            user = User.query.filter_by(user_id=member.user_id).first()
             if user:
-                members_info.append({
-                    "user_name": user.username,
-                    "role": role,
-                    "email": user.email  # можно добавить другие поля, например, email или id
-                })
+                members_info.append(user.to_dict())
 
-        # Получаем кейс команды
-        team_case = TeamCase.query.filter_by(team_id=team.id).first()
+        team_case = TeamCase.query.filter_by(team_id=team.team_id).first()
         if not team_case:
             return {"message": "Кейс для этой команды не найден."}, HTTPStatus.NOT_FOUND
 
-        # Формируем ответ
+        case = HackathonCase.query.filter_by(case_id=team_case.case_id).first()
+        if not case:
+            return {"message": "Кейс не найден."}, HTTPStatus.NOT_FOUND
+
         response_data = {
-            "artifacts": artifacts.to_dict(),  # Предполагаем, что у модели есть метод to_dict
+            "artifacts": artifacts.to_dict(),  # метод должен быть реализован в модели TeamArtifacts
             "team_members": members_info,
-            "team_case": {
-                "case_name": team_case.name,
-                "description": team_case.description,
-                "submission_date": team_case.submission_date
-            }
+            "case": case.to_dict()
         }
 
         return response_data, HTTPStatus.OK
+
 
 
 @jury_ns.route('/teams/<int:team_id>/artifacts/review')

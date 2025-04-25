@@ -5,7 +5,8 @@ from flask_restx import Resource
 from backend.core.schemas.auth_schemas import login_model, user_model
 from backend.core.services.profile_service import *
 from . import user_ns
-from ..core.models.team_models import Team, TeamArtifacts
+from ..core.models.hackathon_model import HackathonCase
+from ..core.models.team_models import Team, TeamArtifacts, TeamCase
 from ..core.schemas.team_schemas import team_invite_model, team_model, team_artifacts
 from ..core.services.team_service import create_team, add_member_to_team
 
@@ -193,9 +194,24 @@ class MyTeams(Resource):
         user = get_user_by_username(get_jwt_identity())
 
         lead_teams = Team.query.filter_by(team_lead_id=user.user_id).all()
-
         member_teams = user.teams
 
         all_teams = {team.team_id: team for team in lead_teams + member_teams}.values()
 
-        return [team.to_dict() for team in all_teams], HTTPStatus.OK
+        result = []
+        for team in all_teams:
+            team_data = team.to_dict()
+
+            team_case = TeamCase.query.filter_by(team_id=team.team_id).first()
+            if team_case:
+                hackathon_case = HackathonCase.query.filter_by(case_id=team_case.case_id).first()
+                if hackathon_case:
+                    team_data["case"] = hackathon_case.to_dict()
+                else:
+                    team_data["case"] = None
+            else:
+                team_data["case"] = None
+
+            result.append(team_data)
+
+        return result, HTTPStatus.OK

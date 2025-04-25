@@ -1,7 +1,9 @@
 import os
+import random
 
 from backend.core import db
 from backend.core.models.hackathon_model import HackathonCase
+from backend.core.models.team_models import Team
 from backend.core.services.utilits import save_file
 
 def create_hackathon_case(data, file):
@@ -68,3 +70,33 @@ def delete_hackathon_case(case_id):
     db.session.delete(case)
     db.session.commit()
     return {"message": "Кейс и связанный файл успешно удалены"}, 200
+
+def assign_cases_evenly():
+    teams = Team.query.all()
+    cases = HackathonCase.query.all()
+
+    if not teams or not cases:
+        return {"message": "Нет доступных команд или кейсов."}, 400
+
+    random.shuffle(teams)
+
+    # Создаём пустые "ведра" для кейсов
+    case_buckets = {case.case_id: [] for case in cases}
+
+    # Распределяем команды по кейсам по кругу
+    for idx, team in enumerate(teams):
+        case_id = cases[idx % len(cases)].case_id
+        case_buckets[case_id].append(team)
+
+    # Очищаем старые связи (если нужно)
+    for team in teams:
+        team.cases.clear()
+
+    # Добавляем новые связи
+    for case_id, team_list in case_buckets.items():
+        case = HackathonCase.query.get(case_id)
+        for team in team_list:
+            team.cases.append(case)
+
+    db.session.commit()
+    return {"message": "Кейсы успешно распределены по командам."}, 200

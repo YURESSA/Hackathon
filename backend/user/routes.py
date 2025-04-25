@@ -103,8 +103,10 @@ class TeamItem(Resource):
     def put(self, team_name):
         data = request.get_json()
         inviter = get_user_by_username(get_jwt_identity())
+        print(inviter.user_id)
 
         team = Team.query.filter_by(team_name=team_name).first()
+        print(team.team_lead_id)
         if not team or team.team_lead_id != inviter.user_id:
             return {"message": "Только тимлид может приглашать участников."}, HTTPStatus.FORBIDDEN
 

@@ -80,7 +80,7 @@ class JuryManage(Resource):
 class TeamList(Resource):
     @jwt_required()
     def get(self):
-        if not organizer_required():
+        if not organizer_or_admin_required():
             return {"message": AuthMessages.AUTH_ACCESS_DENIED}, HTTPStatus.FORBIDDEN
         teams = Team.query.all()
         return [team.to_dict() for team in teams], HTTPStatus.OK

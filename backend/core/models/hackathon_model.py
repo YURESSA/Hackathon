@@ -11,6 +11,8 @@ class HackathonCase(db.Model):
     file_url = Column(String(255), nullable=True)
     original_filename = Column(String(255), nullable=True)
 
+    cases = db.relationship("HackathonCase", secondary="team_cases", backref="teams")
+
     def __repr__(self):
         return f"<HackathonCase {self.title}>"
 

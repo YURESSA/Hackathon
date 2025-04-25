@@ -11,7 +11,8 @@ from ..core.messages import AuthMessages
 from ..core.models.hackathon_model import HackathonCase
 from ..core.schemas.auth_schemas import login_model, change_password_model, user_model
 from ..core.schemas.hackathon_schemas import hackathon_case_model
-from ..core.services.hackathon_service import update_hackathon_case, delete_hackathon_case, create_hackathon_case
+from ..core.services.hackathon_service import update_hackathon_case, delete_hackathon_case, create_hackathon_case, \
+    assign_cases_evenly
 
 
 def admin_required():
@@ -157,11 +158,8 @@ class HackathonCaseResource(Resource):
         except json.JSONDecodeError:
             return {"message": "Невалидный JSON в поле 'data'."}, HTTPStatus.BAD_REQUEST
 
-        # Получаем файл
         file = request.files.get('file')
 
-
-        # Создаем новый кейс
         new_case, error, status = create_hackathon_case(data, file)
         if error:
             return error, status
@@ -240,9 +238,21 @@ class FileDownload(Resource):
         # Путь к файлу на сервере
         filepath = os.path.join(upload_folder, case.file_url)
 
-        # Проверяем существует ли файл на сервере
         if not os.path.exists(filepath):
             return {"message": "Файл не найден."}, 404
 
-        # Отправляем файл с оригинальным именем
         return send_from_directory(upload_folder, case.file_url, as_attachment=True, download_name=original_filename)
+
+
+@admin_ns.route('/assign_cases')
+class AssignCases(Resource):
+    @jwt_required()
+    @admin_ns.doc(description="Распределение кейсов среди команд (только для администратора)")
+    def post(self):
+        """Распределение кейсов среди команд"""
+        if not admin_required():
+            return {"message": "Доступ запрещён"}, HTTPStatus.FORBIDDEN
+
+
+        result, status = assign_cases_evenly()
+        return result, status

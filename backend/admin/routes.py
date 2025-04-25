@@ -9,6 +9,7 @@ from backend.core.services.profile_service import *
 from . import admin_ns
 from ..core.messages import AuthMessages
 from ..core.models.hackathon_model import HackathonCase
+from ..core.models.team_models import Team
 from ..core.schemas.auth_schemas import login_model, change_password_model, user_model
 from ..core.schemas.hackathon_schemas import hackathon_case_model
 from ..core.services.hackathon_service import update_hackathon_case, delete_hackathon_case, create_hackathon_case, \
@@ -253,6 +254,195 @@ class AssignCases(Resource):
         if not admin_required():
             return {"message": "Доступ запрещён"}, HTTPStatus.FORBIDDEN
 
-
         result, status = assign_cases_evenly()
         return result, status
+
+
+@admin_ns.route('/teams')
+class TeamList(Resource):
+    @jwt_required()
+    @admin_ns.doc(description="Получение списка всех команд (только для администратора)")
+    def get(self):
+        """Получить список всех команд"""
+        if not admin_required():
+            return {"message": "Доступ запрещён"}, HTTPStatus.FORBIDDEN
+
+        teams = Team.query.all()
+        team_list = [team.to_dict() for team in teams]
+        return {"teams": team_list}, HTTPStatus.OK
+
+
+@admin_ns.route('/teams/<string:team_name>')
+class TeamDetail(Resource):
+    @jwt_required()
+    @admin_ns.doc(description="Получение информации о команде по названию (только для администратора)")
+    def get(self, team_name):
+        """Получить информацию о команде по названию"""
+        if not admin_required():
+            return {"message": "Доступ запрещён"}, HTTPStatus.FORBIDDEN
+
+        team = Team.query.filter_by(team_name=team_name).first()  # Поиск по названию
+        if not team:
+            return {"message": "Команда не найдена."}, HTTPStatus.NOT_FOUND
+
+        return team.to_dict(), HTTPStatus.OK
+
+
+@admin_ns.route('/teams/<string:team_name>/members')
+class TeamMembers(Resource):
+    @jwt_required()
+    @admin_ns.doc(description="Получение списка членов команды по названию (только для администратора)")
+    def get(self, team_name):
+        """Получить список членов команды по названию"""
+        if not admin_required():
+            return {"message": "Доступ запрещён"}, HTTPStatus.FORBIDDEN
+
+        team = Team.query.filter_by(team_name=team_name).first()  # Поиск по названию
+        if not team:
+            return {"message": "Команда не найдена."}, HTTPStatus.NOT_FOUND
+
+        # Члены команды
+        members = [member.to_dict() for member in team.members]
+        return {"members": members}, HTTPStatus.OK
+
+    @jwt_required()
+    @admin_ns.doc(description="Добавление члена в команду по названию (только для администратора)")
+    @admin_ns.param('user_id', 'ID пользователя для добавления')
+    def post(self, team_name):
+        """Добавить нового члена в команду по названию"""
+        if not admin_required():
+            return {"message": "Доступ запрещён"}, HTTPStatus.FORBIDDEN
+
+        user_id = request.args.get('user_id')
+        team = Team.query.filter_by(team_name=team_name).first()  # Поиск по названию
+        if not team:
+            return {"message": "Команда не найдена."}, HTTPStatus.NOT_FOUND
+
+        user = User.query.get(user_id)
+        if not user:
+            return {"message": "Пользователь не найден."}, HTTPStatus.NOT_FOUND
+
+        # Добавляем пользователя в команду
+        if user not in team.members:
+            team.members.append(user)
+            db.session.commit()
+            return {"message": "Пользователь успешно добавлен в команду."}, HTTPStatus.OK
+        return {"message": "Пользователь уже является членом команды."}, HTTPStatus.BAD_REQUEST
+
+    @jwt_required()
+    @admin_ns.doc(description="Удаление члена из команды по названию (только для администратора)")
+    @admin_ns.param('user_id', 'ID пользователя для удаления')
+    def delete(self, team_name):
+        """Удалить члена из команды по названию"""
+        if not admin_required():
+            return {"message": "Доступ запрещён"}, HTTPStatus.FORBIDDEN
+
+        user_id = request.args.get('user_id')
+        team = Team.query.filter_by(team_name=team_name).first()  # Поиск по названию
+        if not team:
+            return {"message": "Команда не найдена."}, HTTPStatus.NOT_FOUND
+
+        user = User.query.get(user_id)
+        if not user:
+            return {"message": "Пользователь не найден."}, HTTPStatus.NOT_FOUND
+
+        # Удаляем пользователя из команды
+        if user in team.members:
+            team.members.remove(user)
+            db.session.commit()
+            return {"message": "Пользователь успешно удалён из команды."}, HTTPStatus.OK
+        return {"message": "Пользователь не является членом команды."}, HTTPStatus.BAD_REQUEST
+
+
+@admin_ns.route('/jury')
+class JuryList(Resource):
+    @jwt_required()
+    @admin_ns.doc(description="Получение списка всех членов жюри")
+    def get(self):
+        """Получить список всех членов жюри"""
+        if not admin_required():
+            return {"message": "Доступ запрещён"}, HTTPStatus.FORBIDDEN
+
+        # Получаем роль "jury"
+        jury_role = Role.query.filter_by(role_name="jury").first()
+        if not jury_role:
+            return {"message": "Роль 'jury' не найдена."}, HTTPStatus.NOT_FOUND
+
+        # Получаем всех пользователей с этой ролью
+        jury_members = User.query.filter_by(system_role_id=jury_role.role_id).all()
+        jury_list = [user.to_dict() for user in jury_members]
+        return {"jury": jury_list}, HTTPStatus.OK
+
+    @jwt_required()
+    @admin_ns.expect(user_model)
+    @admin_ns.doc(description="Добавление члена в жюри")
+    def post(self):
+        """Добавить нового члена в жюри"""
+        if not admin_required():
+            return {"message": "Доступ запрещён"}, HTTPStatus.FORBIDDEN
+
+        data = request.get_json()
+        user = get_user_by_username(data.get('username'))
+        if not user:
+            return {"message": "Пользователь не найден."}, HTTPStatus.NOT_FOUND
+
+        # Проверяем, является ли пользователь уже членом жюри
+        if user.system_role.role_name == "jury":
+            return {"message": "Пользователь уже является членом жюри."}, HTTPStatus.BAD_REQUEST
+
+        # Получаем роль "jury"
+        jury_role = Role.query.filter_by(role_name="jury").first()
+        if not jury_role:
+            return {"message": "Роль 'jury' не найдена."}, HTTPStatus.NOT_FOUND
+
+        # Изменяем роль пользователя на "jury"
+        user.system_role = jury_role
+        db.session.commit()
+
+        return {"message": "Пользователь успешно добавлен в жюри."}, HTTPStatus.OK
+
+
+@admin_ns.route('/organizers')
+class OrganizerList(Resource):
+    @jwt_required()
+    @admin_ns.doc(description="Получение списка всех организаторов")
+    def get(self):
+        """Получить список всех организаторов"""
+        if not admin_required():
+            return {"message": "Доступ запрещён"}, HTTPStatus.FORBIDDEN
+
+        # Получаем роль "organizer"
+        organizer_role = Role.query.filter_by(role_name="organizer").first()
+        if not organizer_role:
+            return {"message": "Роль 'organizer' не найдена."}, HTTPStatus.NOT_FOUND
+
+        # Получаем всех пользователей с этой ролью
+        organizers = User.query.filter_by(system_role_id=organizer_role.role_id).all()
+        organizer_list = [user.to_dict() for user in organizers]
+        return {"organizers": organizer_list}, HTTPStatus.OK
+
+    @jwt_required()
+    @admin_ns.expect(user_model)
+    @admin_ns.doc(description="Добавление организатора")
+    def post(self):
+        """Добавить нового организатора"""
+        if not admin_required():
+            return {"message": "Доступ запрещён"}, HTTPStatus.FORBIDDEN
+
+        data = request.get_json()
+        user = get_user_by_username(data.get('username'))
+        if not user:
+            return {"message": "Пользователь не найден."}, HTTPStatus.NOT_FOUND
+
+        if user.system_role.role_name == "organizer":
+            return {"message": "Пользователь уже является организатором."}, HTTPStatus.BAD_REQUEST
+
+        # Получаем роль "organizer"
+        organizer_role = Role.query.filter_by(role_name="organizer").first()
+        if not organizer_role:
+            return {"message": "Роль 'organizer' не найдена."}, HTTPStatus.NOT_FOUND
+
+        # Изменяем роль пользователя на "organizer"
+        user.system_role = organizer_role
+        db.session.commit()
+        return {"message": "Пользователь успешно добавлен в организаторы."}, HTTPStatus.OK

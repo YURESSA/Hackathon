@@ -72,6 +72,7 @@ def update_user_profile(user, data):
     user.study_info = data.get("study_info", user.study_info)
     user.email = data.get("email", user.email)
     user.phone = data.get("phone", user.phone)
+    user.project_role = data.get("project_role", user.project_role)
 
     # Обновление пароля, если он передан
     new_password = data.get("password")

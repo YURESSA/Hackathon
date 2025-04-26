@@ -6,7 +6,7 @@ from backend.core.schemas.auth_schemas import login_model, user_model
 from backend.core.services.profile_service import *
 from . import user_ns
 from ..core.models.hackathon_model import HackathonCase
-from ..core.models.team_models import Team, TeamArtifacts, TeamCase
+from ..core.models.team_models import Team, TeamArtifacts, TeamCase, TeamMember, ArtifactReview
 from ..core.schemas.team_schemas import team_invite_model, team_model, team_artifacts
 from ..core.services.team_service import create_team, add_member_to_team
 
@@ -127,6 +127,17 @@ class TeamItem(Resource):
             return {"message": "Команда не найдена."}, HTTPStatus.NOT_FOUND
 
         if team.team_lead_id == user.user_id:
+            ArtifactReview.query.filter_by(team_id=team.team_id).delete()
+
+            # Удаляем артефакты
+            TeamArtifacts.query.filter_by(team_id=team.team_id).delete()
+
+            # Удаляем кейсы
+            TeamCase.query.filter_by(team_id=team.team_id).delete()
+
+            # Удаляем участников (записи в TeamMember)
+            TeamMember.query.filter_by(team_id=team.team_id).delete()
+
             db.session.delete(team)
             db.session.commit()
             return {"message": f"Вы были тимлидом, команда '{team_name}' удалена."}, HTTPStatus.OK
@@ -215,3 +226,30 @@ class MyTeams(Resource):
             result.append(team_data)
 
         return result, HTTPStatus.OK
+
+
+@user_ns.route('/teams/<string:team_name>/members/<string:username>')
+class RemoveTeamMember(Resource):
+    @jwt_required()
+    @user_ns.doc(description="Удаление участника из команды (доступно только тимлиду)")
+    def delete(self, team_name, username):
+        current_user = get_user_by_username(get_jwt_identity())
+
+        team = Team.query.filter_by(team_name=team_name).first()
+        if not team:
+            return {"message": "Команда не найдена."}, HTTPStatus.NOT_FOUND
+
+        if team.team_lead_id != current_user.user_id:
+            return {"message": "Удаление участников доступно только тимлиду."}, HTTPStatus.FORBIDDEN
+
+        user_to_remove = User.query.filter_by(username=username).first()
+        if not user_to_remove:
+            return {"message": "Пользователь не найден."}, HTTPStatus.NOT_FOUND
+
+        if user_to_remove not in team.members:
+            return {"message": f"Пользователь {username} не состоит в команде."}, HTTPStatus.BAD_REQUEST
+
+        team.members.remove(user_to_remove)
+        db.session.commit()
+
+        return {"message": f"Пользователь {username} удалён из команды {team_name}."}, HTTPStatus.OK

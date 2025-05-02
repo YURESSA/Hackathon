@@ -1,56 +1,58 @@
 <template>
-  <div class="page-wrapper">
-    <Header class="header-profile"></Header>
+  <div class="teams">
+    <div class="page-wrapper">
     <div class="teams">
-      <div class="titles">
-        <h1 class="teams-title">команда BugSlayers</h1>
-        <h1 class="case">кейс №3</h1>
-      </div>
       <ul class="table-criteria">
         <li class="table-criteria-item">
           <p class="table-criteria-item-count">1 критерий</p>
-          <Input class="table-criteria-item-grade" placeholder="4"></Input>
+          <p class="table-criteria-item-grade">6</p>
         </li>
         <li class="table-criteria-item">
           <p class="table-criteria-item-count">2 критерий</p>
-          <Input class="table-criteria-item-grade" placeholder="2"></Input>
+          <p class="table-criteria-item-grade">4</p>
         </li>
         <li class="table-criteria-item">
           <p class="table-criteria-item-count">3 критерий</p>
-          <Input class="table-criteria-item-grade" placeholder="10"></Input>
+          <p class="table-criteria-item-grade">2</p>
         </li>
         <li class="table-criteria-item">
           <p class="table-criteria-item-count">4 критерий</p>
-          <Input class="table-criteria-item-grade" placeholder="6"></Input>
+          <p class="table-criteria-item-grade">10</p>
         </li>
         <li class="table-criteria-item">
           <p class="table-criteria-item-count">5 критерий</p>
-          <Input class="table-criteria-item-grade" placeholder="8"></Input>
+          <p class="table-criteria-item-grade">8</p>
         </li>
       </ul>
-      <Input class="input-field" placeholder="оставить обратную связь"></Input>
       <div class="grade">
         <p class="result">ИТОГО:</p>
         <p class="result-grade">30</p>
       </div>
-      <Button text="СОХРАНИТЬ" class="button-save"></Button>
+      <div class="connection-feedback">
+        <p class="text">Ваше решение выделилось креативным подходом и хорошей технической реализацией. Отличная работа с API и чистый код!
+        Однако не хватило глубины проработки бизнес-модели – как решение будет монетизироваться или масштабироваться? Также в презентации можно было бы ярче показать пользовательский сценарий.</p>
+        <IconButton class="button-pensil">
+          <img class="icon-pensil" src="../assets/img/pensil.png">
+        </IconButton>
+      </div>
     </div>
+  </div>
   </div>
 </template>
 
 <script setup>
-  import Header from '@/components/header.vue';
-  import Button from '@/components/UI/Button.vue';
-  import Input from '@/components/UI/Input.vue';
+  import IconButton from '@/components/UI/iconButton.vue';
 </script>
 
 <style scoped>
-  .button-save {
-    width: 494px;
-    margin:50px auto;
-    font-size: 20;
-    height: 78px;
+  .input-field {
+    height: 68px;
+    background-color: rgba(246, 247, 248, 1);
+    border: none;
+    text-transform: uppercase;
   }
+
+
 
   .grade {
     margin-top: 35px;
@@ -64,13 +66,33 @@
     color: rgba(74, 74, 74, 1);
     font-weight: bold;
     align-items: center;
+    margin-bottom: 60px;
   }
 
+  .button-pensil {
+    position:absolute;
+    right: 2%;
+    top: 10%;
+  }
+
+  .text {
+    width: 1153px;
+    margin: 0 auto;
+    font-size: 20px;
+    color: rgba(74, 74, 74, 0.5);
+  }
+  .connection-feedback {
+    display: flex;
+    align-items: center;
+    position: relative;
+    height: 224px;
+    background-color: rgba(146, 146, 146, 0.2);
+    border-radius: 34px;
+  }
   .table-criteria-item-grade {
+    font-size: 32px;
     padding-bottom: 10px;
     max-width: 5%;
-    font-size: 20px;
-    color: rgba(74, 74, 74, 1);
     font-weight: bold;
     text-align: center;
   }
@@ -85,6 +107,8 @@
   }
 
   .table-criteria-item{
+    font-size: 20px;
+    color: rgba(74, 74, 74, 1);
     display: flex;
     justify-content: space-between;
     align-items: center;
@@ -132,7 +156,6 @@
   .page-wrapper {
     margin: 30px auto;
     max-width: 100%;
-    background-image: url('../assets/img/star-top-right.png');
     background-repeat: no-repeat;
     background-position: right top;
   }
